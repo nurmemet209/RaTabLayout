@@ -30,16 +30,18 @@ public class RaTabLayout extends LinearLayout {
     private CustomOnItemClick itemClick;
     private int drawablePadding;
     private int mCurrentPosition = 0;
+    private static final int DURATION = 400;
 
     private int mX1;
     private int mX2;
-    private boolean isDecorateMode = true;
+    private boolean isDecorateMode = false;
     private int mLineHeight = 2;
     private int mArcRadius = 15;
     private int mInset = 35;
     private Path mPath;
 
     private Paint mPaint;
+    private boolean withAnim = false;
 
     public void setDecorateMode(boolean isDecorateMode) {
         this.isDecorateMode = isDecorateMode;
@@ -60,8 +62,7 @@ public class RaTabLayout extends LinearLayout {
 
     private void init() {
         this.setOrientation(HORIZONTAL);
-        setWillNotDraw(false
-        );
+        setWillNotDraw(false);
         //setBackgroundColor(ContextCompat.getColor(getContext(), R.color.main_bg_gray));
     }
 
@@ -171,19 +172,26 @@ public class RaTabLayout extends LinearLayout {
         for (int i = Math.min(newSelPos, oldSelPos); i < Math.min(newSelPos, oldSelPos) + Math.abs(newSelPos - oldSelPos); i++) {
             delta += getChildAt(i).getWidth();
         }
-        ValueAnimator animator = ValueAnimator.ofInt(x1, newSelPos > oldSelPos ? x1 + delta : x1 - delta);
-        animator.setDuration(500);
-        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                final int value = (Integer) animation.getAnimatedValue();
-                mX1 = value + mInset;
-                mX2 = mX1 + width - 2 * mInset;
-                invalidate();
+        if (withAnim) {
+            ValueAnimator animator = ValueAnimator.ofInt(x1, newSelPos > oldSelPos ? x1 + delta : x1 - delta);
+            animator.setDuration(DURATION);
+            animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    final int value = (Integer) animation.getAnimatedValue();
+                    mX1 = value + mInset;
+                    mX2 = mX1 + width - 2 * mInset;
+                    invalidate();
 
-            }
-        });
-        animator.start();
+                }
+            });
+            animator.start();
+        } else {
+            mX1 = (newSelPos > oldSelPos ? x1 + delta : x1 - delta) + mInset;
+            mX2 = mX1 + width - 2 * mInset;
+            invalidate();
+        }
+
     }
 
     public interface BindView {
@@ -242,7 +250,6 @@ public class RaTabLayout extends LinearLayout {
                 final View view = getChildAt(mCurrentPosition);
                 mX1 = view.getLeft() + mLineHeight + mInset;
                 mX2 = view.getWidth() + mX1 - 2 * mInset;
-
             }
         }
     }
