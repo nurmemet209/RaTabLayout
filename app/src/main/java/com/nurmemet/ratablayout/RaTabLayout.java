@@ -1,93 +1,92 @@
 package com.nurmemet.ratablayout;
 
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.PointF;
-import android.graphics.RectF;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static android.widget.LinearLayout.HORIZONTAL;
+
 /**
  * Created by nurmemet on 2016/5/20.
  */
-public class RaTabLayout extends LinearLayout {
+public class RaTabLayout extends FrameLayout {
 
-    private enum DecorateMode {
-        MODE_1, MODE_2
-    }
 
-    private DecorateMode mAnimMode = DecorateMode.MODE_2;
-    private PagerAdapter adapter;
-    private ViewPager viewPager;
-    private BindView bindView;
-    private CustomOnItemClick itemClick;
-    private int drawablePadding;
+    private PagerAdapter mAdapter;
+    private ViewPager mViewPager;
+    private BindView mBindView;
+    private TabItemClickListener mOnItemClick;
+    private int mDrawablePadding;
     private int mCurrentPosition = 0;
-    private static final int DURATION = 400;
-
-    private int mX1;
-    private int mX2;
-    private boolean isDecorateMode = true;
-    private int mLineHeight = 2;
-    private int mArcRadius = 15;
-    private int mInset = 35;
-    private Path mPath;
-
-    private Paint mPaint;
-    private boolean withAnim = false;
-
-    private TriangleDecorate mTriangleDecorate;
-
-    public void setDecorateMode(boolean isDecorateMode) {
-        this.isDecorateMode = isDecorateMode;
-    }
-
+    private RaCanvas mRaCanvas;
+    private LinearLayout mContainer;
+    private List<ViewGroup> mList;
 
 
     public RaTabLayout(Context context) {
-        super(context);
+        this(context,null);
     }
 
     public RaTabLayout(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        init();
+        this(context, attrs,0);
+
     }
 
     public RaTabLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        init();
     }
 
     private void init() {
-        this.setOrientation(HORIZONTAL);
+        mList = new ArrayList<>();
         setWillNotDraw(false);
-        mTriangleDecorate = new TriangleDecorate();
+        mContainer = new LinearLayout(getContext());
+        mContainer.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mContainer.setOrientation(HORIZONTAL);
+        addView(mContainer);
+        mRaCanvas = new RaCanvas(getContext(), new RaCanvas.ChildTest() {
+            @Override
+            public View getChildAt(int pos) {
+                return mContainer.getChildAt(pos);
+            }
+
+            @Override
+            public int getChildCount() {
+                return mContainer.getChildCount();
+            }
+        });
+        mRaCanvas.setLayoutParams(new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        addView(mRaCanvas);
 
         //setBackgroundColor(ContextCompat.getColor(getContext(), R.color.main_bg_gray));
     }
 
     public void setDrawablePadding(int padding) {
-        this.drawablePadding = padding;
+        this.mDrawablePadding = padding;
     }
 
-    public void setViewPager(ViewPager viewPager, BindView bindView, CustomOnItemClick onItemClick) {
+    public void setViewPager(ViewPager viewPager, BindView bindView, TabItemClickListener onItemClick) {
         if (viewPager == null) {
             throw new IllegalStateException("viewpager=null");
         }
-        this.viewPager = viewPager;
-        this.adapter = viewPager.getAdapter();
-        this.bindView = bindView;
-        this.itemClick = onItemClick;
+        this.mViewPager = viewPager;
+        this.mAdapter = viewPager.getAdapter();
+        this.mBindView = bindView;
+        this.mOnItemClick = onItemClick;
 
 
         viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
@@ -98,10 +97,11 @@ public class RaTabLayout extends LinearLayout {
 
             @Override
             public void onPageSelected(int position) {
-                getChildAt(mCurrentPosition).findViewWithTag("title").setSelected(false);
-                getChildAt(position).findViewWithTag("title").setSelected(true);
-                decorateAnimate(position, mCurrentPosition);
+                mList.get(mCurrentPosition).findViewWithTag("title").setSelected(false);
+                mList.get(mCurrentPosition).findViewWithTag("title").setSelected(true);
+                mRaCanvas.decorateAnimate(position, mCurrentPosition);
                 mCurrentPosition = position;
+
             }
 
             @Override
@@ -109,25 +109,26 @@ public class RaTabLayout extends LinearLayout {
 
             }
         });
-        for (int i = 0; i < adapter.getCount(); i++) {
+        for (int i = 0; i < mAdapter.getCount(); i++) {
 
-            LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
             params.weight = 1;
             RelativeLayout container = new RelativeLayout(getContext());
             container.setLayoutParams(params);
             container.setClickable(true);
             container.setGravity(Gravity.CENTER);
-            View v = getTab(i, adapter.getPageTitle(i).toString(), container);
+            View v = getTab(i, mAdapter.getPageTitle(i).toString(), container);
             container.addView(v);
-            container.setBackgroundColor(Color.TRANSPARENT);
-            addView(container);
+            //container.setBackgroundColor(Color.TRANSPARENT);
+            mList.add(container);
+            mContainer.addView(container);
 
         }
 
     }
 
 
-    private View getTab(final int position, String title, View container) {
+    private View getTab(final int position, String title, RelativeLayout container) {
         LinearLayout tab = new LinearLayout(getContext());
         RelativeLayout.LayoutParams param = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
         param.addRule(RelativeLayout.CENTER_IN_PARENT);
@@ -145,27 +146,27 @@ public class RaTabLayout extends LinearLayout {
         final ImageView img = new ImageView(getContext());
 
         LayoutParams params = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        params.leftMargin = drawablePadding;
+        params.leftMargin = mDrawablePadding;
         params.gravity = Gravity.CENTER;
         img.setLayoutParams(params);
         tab.addView(img);
-        if (bindView != null) {
-            bindView.OnBindView(text, img, position);
+        if (mBindView != null) {
+            mBindView.OnBindView(container,text, img, position);
         }
-        container.setBackgroundColor(Color.TRANSPARENT);
+        //
         container.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                int oldPosition = viewPager.getCurrentItem();
-                if (viewPager.getCurrentItem() != position) {
-                    viewPager.setCurrentItem(position, false);
-                    if (itemClick != null) {
-                        itemClick.OnItemClicked(text, img, position, oldPosition, true);
+                int oldPosition = mViewPager.getCurrentItem();
+                if (mViewPager.getCurrentItem() != position) {
+                    mViewPager.setCurrentItem(position, false);
+                    if (mOnItemClick != null) {
+                        mOnItemClick.OnItemClicked(text, img, position, oldPosition, true);
                     }
 
                 } else {
-                    if (itemClick != null) {
-                        itemClick.OnItemClicked(text, img, position, oldPosition, false);
+                    if (mOnItemClick != null) {
+                        mOnItemClick.OnItemClicked(text, img, position, oldPosition, false);
                     }
                 }
             }
@@ -173,159 +174,56 @@ public class RaTabLayout extends LinearLayout {
         return tab;
     }
 
-    private void decorateAnimate(int newSelPos, int oldSelPos) {
-        clearAnimation();
-        final int width = getChildAt(newSelPos).getWidth();
-        View view = getChildAt(oldSelPos);
-        final int x1 = view.getLeft();
-        int delta = 0;
-        for (int i = Math.min(newSelPos, oldSelPos); i < Math.min(newSelPos, oldSelPos) + Math.abs(newSelPos - oldSelPos); i++) {
-            delta += getChildAt(i).getWidth();
-        }
-        if (withAnim) {
-            ValueAnimator animator = ValueAnimator.ofInt(x1, newSelPos > oldSelPos ? x1 + delta : x1 - delta);
-            animator.setDuration(DURATION);
-            animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(ValueAnimator animation) {
-                    final int value = (Integer) animation.getAnimatedValue();
-                    mX1 = value + mInset;
-                    mX2 = mX1 + width - 2 * mInset;
-                    invalidate();
-
-                }
-            });
-            animator.start();
-        } else {
-            mX1 = (newSelPos > oldSelPos ? x1 + delta : x1 - delta) + mInset;
-            mX2 = mX1 + width - 2 * mInset;
-            invalidate();
-        }
-
-    }
 
     public interface BindView {
-        void OnBindView(TextView tv, ImageView img, int position);
+        void OnBindView(RelativeLayout tabContainer,TextView tv, ImageView img, int position);
     }
 
-    public interface CustomOnItemClick {
+    public interface TabItemClickListener {
         void OnItemClicked(TextView tv, ImageView img, int newPosition, int oldPosition, boolean state);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (isDecorateMode) {
-            if (mAnimMode == DecorateMode.MODE_1) {
-                if (mPaint == null) {
-                    mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                    mPaint.setColor(Color.RED);
-                    mPaint.setStrokeWidth(mLineHeight);
-                    mPaint.setStyle(Paint.Style.STROKE);
-                    mPath = new Path();
 
-                }
-
-                mPath.reset();
-                mPath.moveTo(0, getHeight() - mLineHeight);
-                mPath.lineTo(mX1 - mArcRadius, getHeight() - mLineHeight);
-                mPath.moveTo(mX1 - mArcRadius, getHeight() - mLineHeight);
-
-                mPath.addArc(new RectF(mX1 - 2 * mArcRadius, getHeight() - mLineHeight - 2 * mArcRadius, mX1, getHeight() - mLineHeight), 0, 90);
-                mPath.moveTo(mX1, getHeight() - mLineHeight - mArcRadius);
-                mPath.lineTo(mX1, mLineHeight + mArcRadius + mInset);
-                mPath.addArc(new RectF(mX1, mLineHeight + mInset, mX1 + 2 * mArcRadius, mLineHeight + 2 * mArcRadius + mInset), 180, 90);
-
-                mPath.moveTo(mX1 + mArcRadius, mLineHeight + mInset);
-                mPath.lineTo(mX2 - mArcRadius, mLineHeight + mInset);
-                mPath.addArc(new RectF(mX2 - 2 * mArcRadius, mLineHeight + mInset, mX2, mLineHeight + 2 * mArcRadius + mInset), 270, 90);
-
-                mPath.moveTo(mX2, mLineHeight + mArcRadius + mInset);
-                mPath.lineTo(mX2, getHeight() - mLineHeight - mArcRadius);
-                mPath.addArc(new RectF(mX2, getHeight() - 2 * mArcRadius - mLineHeight, mX2 + 2 * mArcRadius, getHeight() - mLineHeight), 90, 90);
-
-                mPath.moveTo(mX2 + mArcRadius, getHeight() - mLineHeight);
-                mPath.lineTo(getWidth() - mLineHeight, getHeight() - mLineHeight);
-
-                canvas.drawPath(mPath, mPaint);
-            } else if (mAnimMode == DecorateMode.MODE_2) {
-                final float itemWidth = (1F) / getChildCount() * getMeasuredWidth();
-                final float x = itemWidth / 2 + mCurrentPosition * itemWidth;
-                final float y = getMeasuredHeight();
-                mTriangleDecorate.draw(canvas, x, y);
-            }
-
-
-        }
 
     }
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        if (mX1 == mX2) {
-            if (getChildCount() > mCurrentPosition) {
-                final View view = getChildAt(mCurrentPosition);
-                mX1 = view.getLeft() + mLineHeight + mInset;
-                mX2 = view.getWidth() + mX1 - 2 * mInset;
-            }
-        }
     }
 
+    /**
+     * 三角形外接圆半径
+     * @param radius
+     */
     public void setTriangleRadius(float radius) {
-        mTriangleDecorate.setTriangleRadius(radius);
+        mRaCanvas.setTriangleRadius(radius);
     }
 
-    public void setTriangleColor(int color) {
-        mTriangleDecorate.setTriangleColor(color);
+    /**
+     * 装饰颜色
+     * @param color
+     */
+
+    public void setDecorateColor(int color) {
+        mRaCanvas.setDecorateColor(color);
     }
 
 
-    private static class TriangleDecorate {
-
-        private Paint mPaint;
-        private int mColor = 0xFFFFA500;
-        private float mRadius = 20;
-        private Path mPath;
-        private PointF mFirstP = new PointF(), mSecondP = new PointF(), mThirdP = new PointF();
-
-        void init() {
-            mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            mPaint.setColor(mColor);
-            mPath = new Path();
-
-        }
-
-        public TriangleDecorate() {
-            init();
-        }
-
-        void draw(Canvas canvas, float x, float y) {
-
-            mPath.reset();
-
-            mFirstP.x = x - mRadius;
-            mFirstP.y = y;
-            mSecondP.x = x;
-            mSecondP.y = y - (float) (mRadius * Math.sqrt(3));
-            mThirdP.x = x + mRadius;
-            mThirdP.y = y;
-
-            mPath.moveTo(mFirstP.x, mFirstP.y);
-            mPath.lineTo(mSecondP.x, mSecondP.y);
-            mPath.lineTo(mThirdP.x, mThirdP.y);
-
-            canvas.drawPath(mPath, mPaint);
-
-        }
-
-        void setTriangleRadius(float radius) {
-            mRadius = radius;
-        }
-
-        void setTriangleColor(int color) {
-            mColor = color;
-        }
-
+    public void setIsDecorateMode(boolean isDecorateMode) {
+        mRaCanvas.setIsDecorateMode(isDecorateMode);
     }
+    /**
+     * 装饰类型
+     *
+     * @param mode
+     */
+    public void setDecorateMode(RaCanvas.DecorateMode mode) {
+        mRaCanvas.setDecorateMode(mode);
+    }
+
+
 }
